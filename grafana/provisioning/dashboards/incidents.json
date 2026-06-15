@@ -1,0 +1,191 @@
+{
+  "uid": "incidents",
+  "title": "Incident Overview Dashboard",
+  "tags": ["incidents", "alerts", "sre"],
+  "timezone": "browser",
+  "refresh": "10s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "🔴 Active Alerts",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "left" } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "severity" },
+            "properties": [{
+              "id": "custom.displayMode", "value": "color-background"
+            }]
+          }
+        ]
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "ALERTS{alertstate=\"firing\"}",
+        "legendFormat": "{{alertname}} | {{severity}} | {{instance}}",
+        "instant": true
+      }]
+    },
+    {
+      "id": 2,
+      "title": "Alert State Timeline",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "lineWidth": 3, "fillOpacity": 40 }
+        }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "ALERTS",
+        "legendFormat": "{{alertname}} [{{severity}}]"
+      }]
+    },
+    {
+      "id": 3,
+      "title": "Error Count (Last 6h)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red", "value": 50 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "sum(increase(application_errors_total[6h]))",
+        "legendFormat": "Errors"
+      }]
+    },
+    {
+      "id": 4,
+      "title": "5xx Errors (Last 6h)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "sum(increase(http_requests_total{status_code=~\"5..\"}[6h]))",
+        "legendFormat": "5xx Errors"
+      }]
+    },
+    {
+      "id": 5,
+      "title": "Max CPU (Last 6h)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 60 },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "max_over_time(app_cpu_usage_percent[6h])",
+        "legendFormat": "Peak CPU"
+      }]
+    },
+    {
+      "id": 6,
+      "title": "Max Memory (Last 6h)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 350000000 },
+              { "color": "red", "value": 450000000 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "max_over_time(app_memory_usage_bytes{type=\"heap\"}[6h])",
+        "legendFormat": "Peak Memory"
+      }]
+    },
+    {
+      "id": 7,
+      "title": "Error Rate % Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": { "lineWidth": 2, "fillOpacity": 20 },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "sum(rate(http_requests_total{status_code=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
+        "legendFormat": "Error Rate %"
+      }]
+    },
+    {
+      "id": 8,
+      "title": "p99 Latency Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "lineWidth": 2, "fillOpacity": 15 },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))",
+        "legendFormat": "p99 Latency"
+      }]
+    }
+  ]
+}

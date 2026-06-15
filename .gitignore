@@ -1,0 +1,11 @@
+node_modules/
+logs/
+*.log
+.env
+.DS_Store
+prometheus_data/
+grafana_data/
+alertmanager_data/
+*.pem
+*.key
+

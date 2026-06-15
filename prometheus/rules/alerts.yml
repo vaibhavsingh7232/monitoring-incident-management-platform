@@ -1,0 +1,182 @@
+groups:
+  # ─────────────────────────────────────────────
+  # INFRASTRUCTURE ALERTS
+  # ─────────────────────────────────────────────
+  - name: infrastructure.alerts
+    interval: 30s
+    rules:
+
+      - alert: HighCPUUsage
+        expr: app_cpu_usage_percent > 80
+        for: 2m
+        labels:
+          severity: warning
+          team: sre
+          category: infrastructure
+        annotations:
+          summary: "High CPU usage detected on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | printf \"%.1f\" }}% (threshold: 80%) on instance {{ $labels.instance }}. Investigate running processes."
+          runbook: "https://wiki.company.com/runbooks/high-cpu"
+          dashboard: "http://grafana:3001/d/infra/infrastructure-health"
+
+      - alert: CriticalCPUUsage
+        expr: app_cpu_usage_percent > 95
+        for: 1m
+        labels:
+          severity: critical
+          team: sre
+          category: infrastructure
+        annotations:
+          summary: "CRITICAL: CPU saturation on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | printf \"%.1f\" }}% on {{ $labels.instance }}. Immediate action required."
+          runbook: "https://wiki.company.com/runbooks/critical-cpu"
+
+      - alert: HighMemoryUsage
+        expr: (app_memory_usage_bytes{type="heap"} / (512 * 1024 * 1024)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          team: sre
+          category: infrastructure
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is above 85% of allocated heap. Current: {{ $value | humanize }}. Check for memory leaks."
+          runbook: "https://wiki.company.com/runbooks/memory-leak"
+
+      - alert: MemoryLeakSuspected
+        expr: deriv(app_memory_usage_bytes{type="heap"}[10m]) > 0 and app_memory_usage_bytes{type="heap"} > 400 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: critical
+          team: sre
+          category: infrastructure
+        annotations:
+          summary: "Possible memory leak detected on {{ $labels.instance }}"
+          description: "Memory is continuously increasing. Current usage: {{ $value | humanize }}. Possible memory leak."
+
+      - alert: HighDiskUsage
+        expr: (node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_free_bytes{mountpoint="/"}) / node_filesystem_size_bytes{mountpoint="/"} * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+          team: sre
+          category: infrastructure
+        annotations:
+          summary: "Disk usage critical on {{ $labels.instance }}"
+          description: "Disk usage is {{ $value | printf \"%.1f\" }}% on {{ $labels.instance }}. Free up disk space immediately."
+
+  # ─────────────────────────────────────────────
+  # APPLICATION ALERTS
+  # ─────────────────────────────────────────────
+  - name: application.alerts
+    interval: 30s
+    rules:
+
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status_code=~"5.."}[5m])) /
+            sum(rate(http_requests_total[5m]))
+          ) * 100 > 5
+        for: 2m
+        labels:
+          severity: warning
+          team: backend
+          category: application
+        annotations:
+          summary: "High HTTP error rate detected"
+          description: "Error rate is {{ $value | printf \"%.1f\" }}% (threshold: 5%). Check application logs for errors."
+          runbook: "https://wiki.company.com/runbooks/high-error-rate"
+
+      - alert: CriticalErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status_code=~"5.."}[5m])) /
+            sum(rate(http_requests_total[5m]))
+          ) * 100 > 20
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+          category: application
+        annotations:
+          summary: "CRITICAL: Very high error rate"
+          description: "Error rate has exceeded 20%. Service degradation likely. Immediate investigation required."
+
+      - alert: HighAPILatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route)
+          ) > 1
+        for: 3m
+        labels:
+          severity: warning
+          team: backend
+          category: application
+        annotations:
+          summary: "High API latency on route {{ $labels.route }}"
+          description: "95th percentile latency is {{ $value | printf \"%.2f\" }}s on {{ $labels.route }}. SLA breach risk."
+          runbook: "https://wiki.company.com/runbooks/high-latency"
+
+      - alert: VeryHighAPILatency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 3
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+          category: application
+        annotations:
+          summary: "Critical API latency detected"
+          description: "p99 latency is {{ $value | printf \"%.2f\" }}s. Users are severely impacted."
+
+      - alert: ApplicationDown
+        expr: up{job="nodejs-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: sre
+          category: availability
+        annotations:
+          summary: "Application is DOWN"
+          description: "Node.js application has been unreachable for over 1 minute. Immediate response required."
+          runbook: "https://wiki.company.com/runbooks/app-down"
+
+      - alert: LowRequestRate
+        expr: sum(rate(http_requests_total[5m])) < 0.1
+        for: 10m
+        labels:
+          severity: warning
+          team: sre
+          category: application
+        annotations:
+          summary: "Abnormally low request rate"
+          description: "Request rate dropped below 0.1 req/s. Possible traffic routing issue or silent failure."
+
+      - alert: DatabaseConnectionFailure
+        expr: rate(application_errors_total{type="database"}[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+          category: database
+        annotations:
+          summary: "Database connection errors detected"
+          description: "Application is experiencing database connection failures. Check DB health and connectivity."
+
+  # ─────────────────────────────────────────────
+  # PROMETHEUS HEALTH
+  # ─────────────────────────────────────────────
+  - name: monitoring.health
+    rules:
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: warning
+          team: sre
+        annotations:
+          summary: "Prometheus target {{ $labels.job }} is down"
+          description: "Target {{ $labels.instance }} in job {{ $labels.job }} has been down for 2+ minutes."

@@ -1,0 +1,147 @@
+{
+  "uid": "slo",
+  "title": "Service Reliability Dashboard (SLO/SLA)",
+  "tags": ["slo", "sla", "reliability"],
+  "timezone": "browser",
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Availability SLO (99.9% target)",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "min": 99, "max": 100, "unit": "percent",
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 99.5 },
+              { "color": "green", "value": 99.9 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "(1 - sum(rate(http_requests_total{status_code=~\"5..\"}[24h])) / sum(rate(http_requests_total[24h]))) * 100",
+        "legendFormat": "Availability %"
+      }]
+    },
+    {
+      "id": 2,
+      "title": "Error Budget Remaining",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 100, "unit": "percent",
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 25 },
+              { "color": "green", "value": 50 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "max(0, 100 - (sum(rate(http_requests_total{status_code=~\"5..\"}[24h])) / sum(rate(http_requests_total[24h]))) * 100 / 0.1 * 100)",
+        "legendFormat": "Error Budget %"
+      }]
+    },
+    {
+      "id": 3,
+      "title": "Latency SLO (p95 < 500ms)",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 1, "unit": "s",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.3 },
+              { "color": "red", "value": 0.5 }
+            ]
+          }
+        }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[24h])) by (le))",
+        "legendFormat": "p95 Latency"
+      }]
+    },
+    {
+      "id": 4,
+      "title": "24h Request Volume",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "lineWidth": 2, "fillOpacity": 15 }
+        }
+      },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(rate(http_requests_total[5m]))",
+          "legendFormat": "Total Req/s"
+        },
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(rate(http_requests_total{status_code=~\"5..\"}[5m]))",
+          "legendFormat": "Errors/s"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Orders Processed",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "steps": [{ "color": "green", "value": null }]
+          }
+        }
+      },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(orders_processed_total{status=\"success\"})",
+          "legendFormat": "Successful Orders"
+        },
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(orders_processed_total{status=\"failed\"})",
+          "legendFormat": "Failed Orders"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Alerts Fired (24h)",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "lineWidth": 2, "fillOpacity": 30 }
+        }
+      },
+      "targets": [{
+        "datasource": "Prometheus",
+        "expr": "ALERTS{alertstate=\"firing\"}",
+        "legendFormat": "{{alertname}} [{{severity}}]"
+      }]
+    }
+  ]
+}
